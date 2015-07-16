@@ -17,12 +17,17 @@ import com.linkedin.camus.coders.MessageDecoder;
 import com.linkedin.camus.coders.MessageDecoderException;
 import com.linkedin.camus.schemaregistry.CachedSchemaRegistry;
 import com.linkedin.camus.schemaregistry.SchemaRegistry;
+
 import org.apache.hadoop.io.Text;
 
 public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 	protected DecoderFactory decoderFactory;
 	protected SchemaRegistry<Schema> registry;
 	private Schema latestSchema;
+	private static final int PREFIX_BITS = 16;
+
+    /** Start of the epoch for Technorati purposes. */
+private static final long TECHNORATI_EPOCH = 1380610800000L;
 	
 	@Override
 	public void init(Properties props, String topicName) {
@@ -144,11 +149,20 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 
 	        if (header != null && header.get("time") != null) {
 	            return (Long) header.get("time");
-	        } else if (super.getRecord().get("timestamp") != null) {
-	            return (Long) super.getRecord().get("timestamp");
+	        }else if (super.getRecord().get("ev_type").toString().equals("20") || super.getRecord().get("ev_type").toString().equals("21") || super.getRecord().get("ev_type").toString().equals("22") ) {
+	        	return (Long)super.getRecord().get("ts");
+	        }
+	        else if (super.getRecord().get("req_id") != null) {
+	            return getTimeStamp((Long) super.getRecord().get("req_id"));
 	        } else {
 	            return System.currentTimeMillis();
 	        }
 	    }
+	    
+	    private long getTimeStamp(Long req_id) {
+			return (req_id >> PREFIX_BITS) + TECHNORATI_EPOCH;
+		}
+	    
+	   
 	}
 }

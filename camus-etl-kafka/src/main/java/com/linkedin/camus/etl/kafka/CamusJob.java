@@ -116,6 +116,9 @@ public class CamusJob extends Configured implements Tool {
 	  }
 
 	private static HashMap<String, Long> timingMap = new HashMap<String, Long>();
+	
+	private long startTime;
+	
 
 	public static void startTiming(String name) {
 		timingMap.put(name,
@@ -227,7 +230,7 @@ public class CamusJob extends Configured implements Tool {
 	}
 
 	public void run() throws Exception {
-
+        startTime = System.currentTimeMillis();
 		startTiming("pre-setup");
 		startTiming("total");
 		Job job = createJob(props);
@@ -361,7 +364,7 @@ public class CamusJob extends Configured implements Tool {
 		startTiming("commit");
 
         // Send Tracking counts to Kafka
-        sendTrackingCounts(job, fs, newExecutionOutput);
+        //sendTrackingCounts(job, fs, newExecutionOutput);
 
         Map<EtlKey, ExceptionWritable> errors = readErrors(fs, newExecutionOutput);
 
@@ -403,6 +406,12 @@ public class CamusJob extends Configured implements Tool {
         if(!errors.isEmpty() && props.getProperty(ETL_FAIL_ON_ERRORS, Boolean.FALSE.toString())
                 .equalsIgnoreCase(Boolean.TRUE.toString())) {
             throw new RuntimeException("Camus saw errors, check stderr");
+        }
+        String signal = props.getProperty("signal", "true");
+       // System.out.println(props);
+        if(signal.equals("true")) {
+         System.out.println("setting complete flag");
+         signalSuccess(fs);
         }
 	}
 
@@ -692,6 +701,7 @@ public class CamusJob extends Configured implements Tool {
 		props.putAll(cmd.getOptionProperties("D"));
 
 		run();
+		
 		return 0;
 	}
 
@@ -749,5 +759,23 @@ public class CamusJob extends Configured implements Tool {
 
 	public static boolean getLog4jConfigure(JobContext job) {
 		return job.getConfiguration().getBoolean(LOG4J_CONFIGURATION, false);
+	}
+	
+	private void signalSuccess(FileSystem fs) throws IOException {
+		DateTime dt = new DateTime(startTime);
+
+		for(int i = 1; i < 4; i++) {
+			DateTime previousHour = dt.minusHours(i);
+			DateTimeFormatter df = DateUtils.getDateTimeFormatter(
+				      "YYYY/MM/dd/HH", DateTimeZone.UTC);
+			String prefix ="/streams/camus/impressions/impressionsAvroStream2/hourly/";
+			String partition = previousHour.toString(df);
+			Path doneFlag= new Path(prefix+partition+ "/_SUCCESS");
+			if(!fs.exists(doneFlag)) {
+				System.out.println("creating Done Flag " + doneFlag.toString());
+				fs.createNewFile(doneFlag);
+			}
+		}
+
 	}
 }

@@ -51,8 +51,9 @@ public class EtlMultiOutputRecordWriter extends RecordWriter<EtlKey, Object>
 
     if (EtlInputFormat.getKafkaMaxHistoricalDays(context) != -1)
     {
-      int maxDays = EtlInputFormat.getKafkaMaxHistoricalDays(context);
-      beginTimeStamp = (new DateTime()).minusDays(maxDays).getMillis();
+      int maxHours = EtlInputFormat.getKafkaMaxHistoricalDays(context);
+      //beginTimeStamp = (new DateTime()).minusDays(maxDays).getMillis();
+      beginTimeStamp = (new DateTime()).minusHours(maxHours).getMillis();
     }
     else
     {

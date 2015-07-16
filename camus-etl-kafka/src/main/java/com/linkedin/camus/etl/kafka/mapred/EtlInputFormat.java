@@ -65,7 +65,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
 
 	public static final String KAFKA_MAX_PULL_HRS = "kafka.max.pull.hrs";
 	public static final String KAFKA_MAX_PULL_MINUTES_PER_TASK = "kafka.max.pull.minutes.per.task";
-	public static final String KAFKA_MAX_HISTORICAL_DAYS = "kafka.max.historical.days";
+	public static final String KAFKA_MAX_HISTORICAL_HOURS = "kafka.max.historical.hours";
 
 	public static final String CAMUS_MESSAGE_DECODER_CLASS = "camus.message.decoder.class";
 	public static final String ETL_IGNORE_SCHEMA_ERRORS = "etl.ignore.schema.errors";
@@ -566,11 +566,11 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
 	}
 
 	public static void setKafkaMaxHistoricalDays(JobContext job, int val) {
-		job.getConfiguration().setInt(KAFKA_MAX_HISTORICAL_DAYS, val);
+		job.getConfiguration().setInt(KAFKA_MAX_HISTORICAL_HOURS, val);
 	}
 
 	public static int getKafkaMaxHistoricalDays(JobContext job) {
-		return job.getConfiguration().getInt(KAFKA_MAX_HISTORICAL_DAYS, -1);
+		return job.getConfiguration().getInt(KAFKA_MAX_HISTORICAL_HOURS, -1);
 	}
 
 	public static void setKafkaBlacklistTopic(JobContext job, String val) {

@@ -5,13 +5,16 @@ import kafka.message.Message;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.BinaryDecoder;
+import org.apache.avro.io.Decoder;
+import org.apache.commons.codec.DecoderException;
 import org.apache.hadoop.conf.Configuration;
 
 import com.linkedin.camus.coders.CamusWrapper;
 
 public class LatestSchemaKafkaAvroMessageDecoder extends KafkaAvroMessageDecoder
 {
-
+   
 	@Override
 	public CamusWrapper<Record> decode(byte[] payload)
 	{
@@ -23,18 +26,20 @@ public class LatestSchemaKafkaAvroMessageDecoder extends KafkaAvroMessageDecoder
 			
 			reader.setSchema(schema);
 			
-			return new CamusWrapper<Record>(reader.read(
-                    null, 
-                    decoderFactory.jsonDecoder(
-                            schema, 
-                            new String(
-                                    payload, 
-                                    //Message.payloadOffset(message.magic()),
-                                    Message.MagicOffset(),
-                                    payload.length - Message.MagicOffset()
-                            )
-                    )
-            ));
+			   return new CamusWrapper<Record>(reader.read(
+					                      null, 
+					                      decoderFactory.jsonDecoder(
+					                             schema, 
+					                              new String(
+					                                      payload, 
+					                                       //Message.payloadOffset(message.magic()),
+					                                       Message.MagicOffset(),
+					                                       payload.length - Message.MagicOffset()
+					                               )
+					                       )
+					               ));
+
+
 		}
 		catch (Exception e)
 		{
