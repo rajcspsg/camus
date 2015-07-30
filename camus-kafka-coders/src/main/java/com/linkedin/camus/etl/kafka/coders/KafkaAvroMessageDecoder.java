@@ -1,30 +1,28 @@
 package com.linkedin.camus.etl.kafka.coders;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Properties;
-
-import kafka.message.Message;
-
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData.Record;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-
 import com.linkedin.camus.coders.CamusWrapper;
 import com.linkedin.camus.coders.MessageDecoder;
 import com.linkedin.camus.coders.MessageDecoderException;
 import com.linkedin.camus.schemaregistry.CachedSchemaRegistry;
 import com.linkedin.camus.schemaregistry.SchemaRegistry;
-
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData.Record;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.io.Text;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Properties;
 
 public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 	protected DecoderFactory decoderFactory;
 	protected SchemaRegistry<Schema> registry;
 	private Schema latestSchema;
 	private static final int PREFIX_BITS = 16;
+	private ICamusAvroWrapperFactory wrapperFactory = new ReqIdCamusAvroWrapperFactory();
+
 
     /** Start of the epoch for Technorati purposes. */
 private static final long TECHNORATI_EPOCH = 1380610800000L;
@@ -41,6 +39,11 @@ private static final long TECHNORATI_EPOCH = 1380610800000L;
             
             this.registry = new CachedSchemaRegistry<Schema>(registry);
             this.latestSchema = registry.getLatestSchemaByTopic(topicName).getSchema();
+
+			String factoryClassName = props.getProperty("camus.message.decoder.CamusAvroWrapperFactory.class." + topicName);
+			if (factoryClassName != null){
+				wrapperFactory = (ICamusAvroWrapperFactory)Class.forName(factoryClassName).newInstance();
+			}
         } catch (Exception e) {
             throw new MessageDecoderException(e);
         }
@@ -119,14 +122,15 @@ private static final long TECHNORATI_EPOCH = 1380610800000L;
 					helper.getSchema()) : new GenericDatumReader<Record>(
 					helper.getSchema(), helper.getTargetSchema());
 
-			return new CamusAvroWrapper(reader.read(null, decoderFactory
-                    .binaryDecoder(helper.getBuffer().array(),
-                            helper.getStart(), helper.getLength(), null)));
+			return wrapperFactory.create(reader.read(null, decoderFactory
+					.binaryDecoder(helper.getBuffer().array(),
+							helper.getStart(), helper.getLength(), null)));
 	
 		} catch (IOException e) {
 			throw new MessageDecoderException(e);
 		}
 	}
+
 
 	public static class CamusAvroWrapper extends CamusWrapper<Record> {
 
@@ -149,20 +153,71 @@ private static final long TECHNORATI_EPOCH = 1380610800000L;
 
 	        if (header != null && header.get("time") != null) {
 	            return (Long) header.get("time");
-	        }else if (super.getRecord().get("ev_type").toString().equals("20") || super.getRecord().get("ev_type").toString().equals("21") || super.getRecord().get("ev_type").toString().equals("22") ) {
-	        	return (Long)super.getRecord().get("ts");
-	        }
-	        else if (super.getRecord().get("req_id") != null) {
-	            return getTimeStamp((Long) super.getRecord().get("req_id"));
 	        } else {
 	            return System.currentTimeMillis();
 	        }
 	    }
 	    
-	    private long getTimeStamp(Long req_id) {
-			return (req_id >> PREFIX_BITS) + TECHNORATI_EPOCH;
+
+
+
+	}
+
+	public interface ICamusAvroWrapperFactory{
+		public CamusWrapper<Record> create(Record record);
+	}
+
+	public static class CamusAvroWrapperFactory implements ICamusAvroWrapperFactory{
+		public CamusWrapper<Record> create(Record record) {
+			return new CamusAvroWrapper(record);
 		}
-	    
-	   
+	}
+
+	public static class ReqIdCamusAvroWrapperFactory implements ICamusAvroWrapperFactory{
+		public class CamusAvroWrappe extends CamusAvroWrapper{
+
+			public CamusAvroWrappe(Record record) {
+				super(record);
+			}
+
+			@Override
+			public long getTimestamp() {
+				if (super.getRecord().get("req_id") != null) {
+					return getTimeStamp((Long) getRecord().get("req_id"));
+				} else {
+					return System.currentTimeMillis();
+				}
+			}
+
+			private long getTimeStamp(Long req_id) {
+				return (req_id >> PREFIX_BITS) + TECHNORATI_EPOCH;
+			}
+		}
+		public CamusWrapper<Record> create(Record record) {
+			return new CamusAvroWrappe(record);
+		}
+	}
+
+	public static class TsCamusAvroWrapperFactory implements ICamusAvroWrapperFactory{
+		public class CamusAvroWrappe extends CamusAvroWrapper{
+
+			public CamusAvroWrappe(Record record) {
+				super(record);
+			}
+
+			@Override
+			public long getTimestamp() {
+				if (getRecord().get("ts") != null) {
+					return (Long)getRecord().get("ts");
+				} else {
+					return System.currentTimeMillis();
+				}
+			}
+
+		}
+
+		public CamusWrapper<Record> create(Record record) {
+			return new CamusAvroWrappe(record);
+		}
 	}
 }
