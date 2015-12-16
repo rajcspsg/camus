@@ -5,8 +5,9 @@
 	<parent>
 		<groupId>com.linkedin.camus</groupId>
 		<artifactId>camus-parent</artifactId>
-		<version>0.1.1</version>
+		<version>0.1.4</version>
 	</parent>
+
 
 	<artifactId>camus-etl-kafka</artifactId>
 	<name>Camus ETL to move data from Kafka to Hadoop.</name>

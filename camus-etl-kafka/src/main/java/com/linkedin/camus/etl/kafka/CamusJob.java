@@ -1,42 +1,12 @@
 package com.linkedin.camus.etl.kafka;
 
-import com.linkedin.camus.etl.kafka.common.DateUtils;
-import com.linkedin.camus.etl.kafka.common.EtlCounts;
-import com.linkedin.camus.etl.kafka.common.EtlKey;
-import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
-import com.linkedin.camus.etl.kafka.common.Source;
+import com.linkedin.camus.etl.kafka.common.*;
 import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlMapper;
 import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.Comparator;
-import java.util.Arrays;
-import java.util.regex.Pattern;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.OptionBuilder;
+import com.linkedin.camus.etl.kafka.mapred.EtlSeqfileInputFormat;
+import org.apache.commons.cli.*;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -47,18 +17,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.mapred.JobClient;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.JobID;
-import org.apache.hadoop.mapred.TIPStatus;
-import org.apache.hadoop.mapred.TaskCompletionEvent;
-import org.apache.hadoop.mapred.TaskReport;
+import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.CounterGroup;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -71,10 +35,21 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+import java.text.NumberFormat;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.regex.Pattern;
+
 public class CamusJob extends Configured implements Tool {
 
 	public static final String ETL_EXECUTION_BASE_PATH = "etl.execution.base.path";
 	public static final String ETL_EXECUTION_HISTORY_PATH = "etl.execution.history.path";
+	public static final String ETL_EXECUTION_HISTORY_DATASET_PATH = "etl.execution.history.dataset.path";
 	public static final String ETL_COUNTS_PATH = "etl.counts.path";
 	public static final String ETL_KEEP_COUNT_FILES = "etl.keep.count.files";
 	public static final String ETL_BASEDIR_QUOTA_OVERIDE = "etl.basedir.quota.overide";
@@ -316,17 +291,28 @@ public class CamusJob extends Configured implements Tool {
 	    }
 		}
 
-		// determining most recent execution and using as the starting point for
-		// this execution
-		if (executions.length > 0) {
-			Path previous = executions[executions.length - 1].getPath();
-			FileInputFormat.setInputPaths(job, previous);
-			log.info("Previous execution: " + previous.toString());
-		} else {
-			System.out
-					.println("No previous execution, all topics pulled from earliest available offset");
-		}
+        boolean fileMode = job.getConfiguration().getBoolean("fileMode",false);
 
+        if (fileMode){
+            log.info("It is running in file mode.");
+            EtlSeqfileInputFormat.setInputDirRecursive(job, true);
+            job.setInputFormatClass(EtlSeqfileInputFormat.class);
+            log.info("Input file paths are: " + EtlSeqfileInputFormat.getInputPaths(job));
+        } else {
+            // determining most recent execution and using as the starting point for
+            // this execution
+            if (executions.length > 0) {
+                Path previous = executions[executions.length - 1].getPath();
+                org.apache.hadoop.mapreduce.lib.input.FileInputFormat.setInputPaths(job, previous);
+                log.info("Previous execution: " + previous.toString());
+            } else {
+                log.info("No previous execution, all topics pulled from earliest available offset");
+            }
+
+            EtlInputFormat.setLogger(log);
+            job.setInputFormatClass(EtlInputFormat.class);
+
+        }
 		// creating new execution dir. offsets, error_logs, and count files will
 		// be written to this directory. data is not written to the
 		// output directory in a normal run, but instead written to the
@@ -339,10 +325,14 @@ public class CamusJob extends Configured implements Tool {
 		log.info("New execution temp location: "
 				+ newExecutionOutput.toString());
 
-		EtlInputFormat.setLogger(log);
-		job.setMapperClass(EtlMapper.class);
-		
-		job.setInputFormatClass(EtlInputFormat.class);
+
+
+
+
+
+
+
+        job.setMapperClass(EtlMapper.class);
 		job.setOutputFormatClass(EtlMultiOutputFormat.class);
 		job.setNumReduceTasks(0);
 
@@ -377,7 +367,8 @@ public class CamusJob extends Configured implements Tool {
             log.error(entry.getValue().toString());
         }
 
-		Path newHistory = new Path(execHistory, executionDate);
+		String datePath = props.getProperty(ETL_EXECUTION_HISTORY_DATASET_PATH, executionDate);
+		Path newHistory = new Path(execHistory, datePath);
 		log.info("Moving execution to history : " + newHistory);
 		fs.rename(newExecutionOutput, newHistory);
 
@@ -693,8 +684,9 @@ public class CamusJob extends Configured implements Tool {
                     cmd.getOptionValue('p')));
 
 		if (cmd.hasOption('P')) {
-			File file = new File(cmd.getOptionValue('P'));
-			FileInputStream fStream = new FileInputStream(file);
+			Path file = new Path(cmd.getOptionValue('P'));
+			FileSystem fs = FileSystem.get(new Configuration());
+			InputStream fStream = fs.open(file);
 			props.load(fStream);
 		}
 
