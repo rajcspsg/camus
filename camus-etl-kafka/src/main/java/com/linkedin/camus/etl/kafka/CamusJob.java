@@ -1,12 +1,28 @@
 package com.linkedin.camus.etl.kafka;
 
-import com.linkedin.camus.etl.kafka.common.*;
-import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
-import com.linkedin.camus.etl.kafka.mapred.EtlMapper;
-import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
-import com.linkedin.camus.etl.kafka.mapred.EtlSeqfileInputFormat;
-import org.apache.commons.cli.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -17,7 +33,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobID;
+import org.apache.hadoop.mapred.TIPStatus;
+import org.apache.hadoop.mapred.TaskCompletionEvent;
+import org.apache.hadoop.mapred.TaskReport;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.CounterGroup;
 import org.apache.hadoop.mapreduce.Counters;
@@ -35,15 +56,15 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URISyntaxException;
-import java.text.NumberFormat;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.regex.Pattern;
+import com.linkedin.camus.etl.kafka.common.DateUtils;
+import com.linkedin.camus.etl.kafka.common.EtlCounts;
+import com.linkedin.camus.etl.kafka.common.EtlKey;
+import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
+import com.linkedin.camus.etl.kafka.common.Source;
+import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
+import com.linkedin.camus.etl.kafka.mapred.EtlMapper;
+import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
+import com.linkedin.camus.etl.kafka.mapred.EtlSeqfileInputFormat;
 
 public class CamusJob extends Configured implements Tool {
 
@@ -402,7 +423,7 @@ public class CamusJob extends Configured implements Tool {
        // System.out.println(props);
         if(signal.equals("true")) {
          System.out.println("setting complete flag");
-         signalSuccess(fs);
+         signalSuccess(fs, job);
         }
 	}
 
@@ -753,14 +774,14 @@ public class CamusJob extends Configured implements Tool {
 		return job.getConfiguration().getBoolean(LOG4J_CONFIGURATION, false);
 	}
 	
-	private void signalSuccess(FileSystem fs) throws IOException {
+	private void signalSuccess(FileSystem fs, JobContext job) throws IOException {
 		DateTime dt = new DateTime(startTime);
 
 		for(int i = 1; i < 4; i++) {
 			DateTime previousHour = dt.minusHours(i);
 			DateTimeFormatter df = DateUtils.getDateTimeFormatter(
 				      "YYYY/MM/dd/HH", DateTimeZone.UTC);
-			String prefix ="/streams/camus/impressions/impressionsAvroStream2/hourly/";
+			String prefix = job.getConfiguration().get(EtlMultiOutputFormat.ETL_DESTINATION_PATH)+"/impressionsAvroStream2/hourly/";
 			String partition = previousHour.toString(df);
 			Path doneFlag= new Path(prefix+partition+ "/_SUCCESS");
 			if(!fs.exists(doneFlag)) {

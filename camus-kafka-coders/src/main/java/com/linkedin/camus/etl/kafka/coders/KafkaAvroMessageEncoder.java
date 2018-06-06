@@ -89,9 +89,7 @@ public class KafkaAvroMessageEncoder extends MessageEncoder<IndexedRecord, byte[
                 writer = new GenericDatumWriter<IndexedRecord>(record.getSchema());
             writer.write(record, encoder);
 
-            System.err.println(out.toByteArray().length);
             return out.toByteArray();
-            //return new Message(out.toByteArray());
         } catch (IOException e) {
             throw new MessageEncoderException(e);
         }
