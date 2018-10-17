@@ -8,13 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
-
 import kafka.server.KafkaConfig;
-import kafka.server.KafkaServer;
-import kafka.utils.Time;
-import kafka.utils.Utils;
-
-import org.apache.zookeeper.server.NIOServerCnxn;
+import kafka.server.KafkaServerStartable;
+import org.apache.kafka.common.utils.Utils;
+import org.apache.zookeeper.server.NIOServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 
 public class KafkaCluster {
@@ -23,7 +20,7 @@ public class KafkaCluster {
     private static final String TEMP_DIR_PREFIX = "camus-";
     
     private final EmbeddedZookeeper zookeeper;
-    private final List<KafkaServer> brokers;
+    private final List<KafkaServerStartable> brokers;
     private final Properties props;
     
     public KafkaCluster() throws IOException {
@@ -37,7 +34,7 @@ public class KafkaCluster {
     public KafkaCluster(Properties baseProperties, int numOfBrokers) throws IOException {
         
         this.zookeeper = new EmbeddedZookeeper();
-        this.brokers = new ArrayList<KafkaServer>();
+        this.brokers = new ArrayList<KafkaServerStartable>();
         
         this.props = new Properties();
         
@@ -80,43 +77,26 @@ public class KafkaCluster {
     }
     
     public void shutdown() {
-        for(KafkaServer broker : brokers) {
+        for(KafkaServerStartable broker : brokers) {
             broker.shutdown();
         }
         zookeeper.shutdown();
     }
     
-    private static KafkaServer startBroker(Properties props) {
-        KafkaServer server = new KafkaServer(new KafkaConfig(props), new SystemTime());
+    private static KafkaServerStartable startBroker(Properties props) {
+        KafkaServerStartable server = KafkaServerStartable.fromProps(props);
         server.startup();
         return server;
     }
     
-    public static class SystemTime implements Time {
-        
-        public long milliseconds() {
-            return System.currentTimeMillis();
-        }
 
-        public long nanoseconds() {
-            return System.nanoTime();
-        }
-
-        public void sleep(long ms) {
-            try {
-                Thread.sleep(ms);
-            } catch (InterruptedException e) {
-                // Ignore
-            }
-        }
-    }
     
     private static class EmbeddedZookeeper {
         
         private final int port;
         private final File snapshotDir;
         private final File logDir;
-        private final NIOServerCnxn.Factory factory;
+        private final NIOServerCnxnFactory factory;
 
         /**
          * Constructs an embedded Zookeeper instance.
@@ -129,10 +109,12 @@ public class KafkaCluster {
             this.port = getAvailablePort();
             this.snapshotDir = getTempDir();
             this.logDir = getTempDir();
-            this.factory = new NIOServerCnxn.Factory(new InetSocketAddress("localhost", port), 1024);
+            this.factory = new NIOServerCnxnFactory();
+            //this.factory = new NIOServerCnxn.Factory(new InetSocketAddress("localhost", port), 1024);
             
             try {
                 int tickTime = 500;
+                factory.configure(new InetSocketAddress("localhost", port), 1024);
                 factory.startup(new ZooKeeperServer(snapshotDir, logDir, tickTime));
             } catch (InterruptedException e) {
                 throw new IOException(e);
@@ -143,9 +125,14 @@ public class KafkaCluster {
          * Shuts down the embedded Zookeeper instance.
          */ 
         public void shutdown() {
-            factory.shutdown();
-            Utils.rm(snapshotDir);
-            Utils.rm(logDir);
+            try {
+                factory.shutdown();
+                Utils.delete(snapshotDir);
+                Utils.delete(logDir);
+            } catch(Exception e) {
+
+            }
+
         }
         
         public String getConnection() {

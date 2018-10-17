@@ -9,10 +9,16 @@
   </parent>
 
   <artifactId>camus-schema-registry-avro</artifactId>
-  <name>Camus schema registry.</name>
+  <name>Camus schema registry avro</name>
   <packaging>jar</packaging>
 
   <dependencies>
+    <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-server</artifactId>
+      <version>1.15</version>
+    </dependency>
+
     <dependency>
       <groupId>com.linkedin.camus</groupId>
       <artifactId>camus-api</artifactId>

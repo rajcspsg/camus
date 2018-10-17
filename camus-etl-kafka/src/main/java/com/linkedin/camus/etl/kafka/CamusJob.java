@@ -16,7 +16,6 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -55,7 +54,6 @@ import org.codehaus.jackson.type.TypeReference;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
-
 import com.linkedin.camus.etl.kafka.common.DateUtils;
 import com.linkedin.camus.etl.kafka.common.EtlCounts;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
@@ -65,6 +63,7 @@ import com.linkedin.camus.etl.kafka.mapred.EtlInputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlMapper;
 import com.linkedin.camus.etl.kafka.mapred.EtlMultiOutputFormat;
 import com.linkedin.camus.etl.kafka.mapred.EtlSeqfileInputFormat;
+import java.nio.file.Files;
 
 public class CamusJob extends Configured implements Tool {
 
@@ -282,7 +281,8 @@ public class CamusJob extends Configured implements Tool {
 			currentCount -= execContent.getFileCount() + execContent.getDirectoryCount();
 			fs.delete(stat.getPath(), true);
 		}
-		
+
+		System.out.println("limit < currentCount "+ (limit < currentCount));
 		// removing failed exectutions if we need room
 		if (limit < currentCount){
 		  FileStatus[] failedExecutions = fs.listStatus(execBasePath, new PathFilter() {
@@ -302,9 +302,11 @@ public class CamusJob extends Configured implements Tool {
 	        return f1.getPath().getName().compareTo(f2.getPath().getName());
 	      }
 	    });
-		  
+
+			System.out.println("failedExecutions.length "+ failedExecutions.length);
 	    for (int i = 0; i < failedExecutions.length && limit < currentCount; i++) {
 	      FileStatus stat = failedExecutions[i];
+			System.out.println("failedExecutions ["+i+"]"+" " + stat.getPath());
 	      log.info("removing failed execution: " + stat.getPath().getName());
 	      ContentSummary execContent = fs.getContentSummary(stat.getPath());
 	      currentCount -= execContent.getFileCount() + execContent.getDirectoryCount();
@@ -313,7 +315,13 @@ public class CamusJob extends Configured implements Tool {
 		}
 
         boolean fileMode = job.getConfiguration().getBoolean("fileMode",false);
-
+		System.out.println("execBasePath " + execBasePath );
+		System.out.println("execBasePath getParent " + execBasePath.getParent() );
+		Path hdfsPathtopic1 = new Path(execBasePath.getParent() + "/destination/topic_1");
+		System.out.println("hdfsPathtopic1 "+ hdfsPathtopic1);
+		java.nio.file.Path nioPath =  java.nio.file.Paths.get(hdfsPathtopic1.toString());
+		System.out.println("pathtopic1 exists" + Files.exists(nioPath));
+		System.out.println("fileMode "+ fileMode);
         if (fileMode){
             log.info("It is running in file mode.");
             EtlSeqfileInputFormat.setInputDirRecursive(job, true);
@@ -334,6 +342,8 @@ public class CamusJob extends Configured implements Tool {
             job.setInputFormatClass(EtlInputFormat.class);
 
         }
+
+		System.out.println("pathtopic1 exists " + Files.exists(nioPath));
 		// creating new execution dir. offsets, error_logs, and count files will
 		// be written to this directory. data is not written to the
 		// output directory in a normal run, but instead written to the
@@ -346,21 +356,17 @@ public class CamusJob extends Configured implements Tool {
 		log.info("New execution temp location: "
 				+ newExecutionOutput.toString());
 
-
-
-
-
-
-
-
         job.setMapperClass(EtlMapper.class);
 		job.setOutputFormatClass(EtlMultiOutputFormat.class);
 		job.setNumReduceTasks(0);
+
+		System.out.println("pathtopic1 exists 362 " + Files.exists(nioPath));
 
 		stopTiming("pre-setup");
 		job.submit();
 		job.waitForCompletion(true);
 
+		System.out.println("pathtopic1 exists 369 " + Files.exists(nioPath));
 		// dump all counters
 		Counters counters = job.getCounters();
 		for (String groupName : counters.getGroupNames()) {
@@ -377,6 +383,7 @@ public class CamusJob extends Configured implements Tool {
         // Send Tracking counts to Kafka
         //sendTrackingCounts(job, fs, newExecutionOutput);
 
+		System.out.println("pathtopic1 exists 385 " + Files.exists(nioPath));
         Map<EtlKey, ExceptionWritable> errors = readErrors(fs, newExecutionOutput);
 
 		// Print any potential errors encountered
@@ -425,6 +432,7 @@ public class CamusJob extends Configured implements Tool {
          System.out.println("setting complete flag");
          signalSuccess(fs, job);
         }
+		System.out.println("pathtopic1 exists 435 " + Files.exists(nioPath));
 	}
 
 	public Map<EtlKey, ExceptionWritable> readErrors(FileSystem fs, Path newExecutionOutput)

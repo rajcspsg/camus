@@ -1,15 +1,9 @@
 package com.linkedin.camus.etl.kafka.coders;
 
 import kafka.message.Message;
-
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.Decoder;
-import org.apache.commons.codec.DecoderException;
-import org.apache.hadoop.conf.Configuration;
-
 import com.linkedin.camus.coders.CamusWrapper;
 
 public class LatestSchemaKafkaAvroMessageDecoder extends KafkaAvroMessageDecoder
@@ -38,8 +32,6 @@ public class LatestSchemaKafkaAvroMessageDecoder extends KafkaAvroMessageDecoder
 					                               )
 					                       )
 					               ));
-
-
 		}
 		catch (Exception e)
 		{

@@ -9,6 +9,7 @@ import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
 import com.linkedin.camus.etl.kafka.common.KafkaReader;
 import kafka.message.Message;
+import kafka.message.NoCompressionCodec;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
@@ -16,9 +17,9 @@ import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
-
 import java.io.IOException;
 import java.util.HashSet;
+import kafka.message.Message.*;
 
 public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
     private static final String PRINT_MAX_DECODER_EXCEPTIONS = "max.decoder.exceptions.to.print";
@@ -73,6 +74,10 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
         log.info("PWD: " + System.getProperty("user.dir"));
         log.info("classloader: " + loader.getClass());
         log.info("org.apache.avro.Schema: " + loader.getResource("org/apache/avro/Schema.class"));
+
+        System.out.println("PWD: " + System.getProperty("user.dir"));
+        System.out.println("classloader: " + loader.getClass());
+        System.out.println("org.apache.avro.Schema: " + loader.getResource("org/apache/avro/Schema.class"));
 
         this.split = (EtlSplit) split;
         this.context = context;
@@ -224,10 +229,13 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
                     byte[] keyBytes = getBytes(msgKey);
                     // check the checksum of message.
                     // If message has partition key, need to construct it with Key for checkSum to match
-                    Message messageWithKey = new Message(bytes,keyBytes);
+                    //Message messageWithKey = new Message(bytes,keyBytes, Message.NoTimestamp, Message.MagicValue_V0);
+                    Message messageWithKey = new Message(bytes, keyBytes, System.currentTimeMillis(), Message.MagicValue_V0());
+
                     Message messageWithoutKey = new Message(bytes);
                     long checksum = key.getChecksum();
                     if (checksum != messageWithKey.checksum() && checksum != messageWithoutKey.checksum()) {
+                        System.out.println("checksum != messageWithKey.checksum() && checksum != messageWithoutKey.checksum()");
                     	throw new ChecksumException("Invalid message checksum : MessageWithKey : "
                               + messageWithKey.checksum() + " MessageWithoutKey checksum : " 
                     		  + messageWithoutKey.checksum() 

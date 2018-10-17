@@ -43,10 +43,6 @@
 			<artifactId>kafka_2.11</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.github.sgroschupf</groupId>
-			<artifactId>zkclient</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.apache.zookeeper</groupId>
 			<artifactId>zookeeper</artifactId>
 			<exclusions>
@@ -80,23 +76,4 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-
-<!-- 	<build> -->
-<!-- 		<plugins> -->
-<!-- 			<plugin> -->
-<!-- 				<groupId>org.apache.avro</groupId> -->
-<!-- 				<artifactId>avro-maven-plugin</artifactId> -->
-<!-- 				<version>1.7.0</version> -->
-<!-- 				<executions>  -->
-<!--  					 <execution> <id>schemas</id> <phase>generate-sources</phase> <goals>   -->
-<!--  						<goal>schema</goal> <goal>protocol</goal> <goal>idl-protocol</goal> </goals>   -->
-<!--  						<configuration> <sourceDirectory>${project.basedir}/src/main/avro/</sourceDirectory>  -->
-<!--  						<outputDirectory>${project.basedir}/src/main/java/</outputDirectory> -->
-<!-- 						<lifecycleMappingMetadata> <action> <ignore /> </action> </lifecycleMappingMetadata></configuration>  -->
-<!--  						</execution>  -->
-<!--  				</executions>  -->
-<!-- 			</plugin> -->
-<!-- 		</plugins> -->
-<!-- 	</build> -->
-
 </project>

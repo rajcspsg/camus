@@ -7,11 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-
-import kafka.message.Message;
-
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.avro.io.BinaryEncoder;
@@ -21,7 +17,6 @@ import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.avro.specific.SpecificRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.Logger;
-
 import com.linkedin.camus.coders.MessageEncoder;
 import com.linkedin.camus.coders.MessageEncoderException;
 import com.linkedin.camus.schemaregistry.SchemaRegistry;
